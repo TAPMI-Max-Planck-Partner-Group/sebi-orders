@@ -2,7 +2,7 @@
 
 A robust, end-to-end automated pipeline to download Securities and Exchange Board of India (SEBI) enforcement and exemption orders, parse the PDF documents, and intelligently extract screenshots and text of social media manipulations (Telegram, WhatsApp, Twitter, etc.) using Google Vertex AI (Gemini Vision).
 
-## 🚀 Key Features
+## Key Features
 
 - **Automated Web Scraping:** Headless downloading of SEBI orders by specific years or recent counts.
 - **Intelligent Vision Extraction:** Uses Vertex AI's multimodal capabilities to scan hundreds of PDF pages, identifying screenshots of social media posts, chats, and internal communications.
@@ -11,7 +11,7 @@ A robust, end-to-end automated pipeline to download Securities and Exchange Boar
 
 ---
 
-## 🏗️ Architecture & Workflow
+## Architecture & Workflow
 
 The pipeline consists of three main stages: **Acquisition**, **Extraction**, and **Reporting**.
 
@@ -47,7 +47,7 @@ Takes the raw CSV data and the physical image crops and stitches them together i
 
 ---
 
-## ⚙️ Setup & Installation
+## Setup & Installation
 
 ### Prerequisites
 1. **Python 3.9+**
@@ -70,7 +70,7 @@ VERTEX_PROJECT_ID=your-google-cloud-project-id
 
 ---
 
-## 📖 Usage Guide
+## Usage Guide
 
 ### Step 1: Download SEBI Orders
 Run the fetch script to populate a local directory with PDFs.
@@ -103,5 +103,5 @@ This will output `final_extracted_posts_with_images.xlsx` containing the structu
 
 ---
 
-## 🛡️ Security Note
+## Security Note
 The `.gitignore` is configured to prevent accidental uploads of your `.env` file, as well as any downloaded PDFs, temporary logs, or output CSV/Excel files. Only the source code is tracked by version control.
