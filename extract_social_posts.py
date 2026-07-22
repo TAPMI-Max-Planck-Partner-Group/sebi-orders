@@ -191,27 +191,60 @@ def extract_posts_from_pdf(pdf_path, max_pages=None, start_page=0):
     return results
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Extract social media posts from SEBI orders PDFs")
+    parser.add_argument("--input-dir", type=str, default="recent 50 orders final", help="Directory containing PDFs")
+    parser.add_argument("--output-prefix", type=str, default="", help="Prefix for output files (e.g. 2025_)")
+    parser.add_argument("--md-log", type=str, default="", help="Markdown file for live progress tracking")
+    args = parser.parse_args()
+
+    PDF_DIR = args.input_dir
+    OUTPUT_DIR = f"{args.output_prefix}crops" if args.output_prefix and not args.output_prefix.endswith('_') else f"{args.output_prefix}_crops" if args.output_prefix else "crops"
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    
+    csv_file = f"{args.output_prefix}extracted_posts.csv" if args.output_prefix and not args.output_prefix.endswith('_') else f"{args.output_prefix}_extracted_posts.csv" if args.output_prefix else "extracted_posts.csv"
+    html_file = f"{args.output_prefix}extracted_posts.html" if args.output_prefix and not args.output_prefix.endswith('_') else f"{args.output_prefix}_extracted_posts.html" if args.output_prefix else "extracted_posts.html"
+    
+    md_file = args.md_log
+
+    if md_file:
+        with open(md_file, "w", encoding="utf-8") as f:
+            f.write(f"# Live Extraction Logs\n\n| PDF File | Status | Found Posts |\n| :--- | :---: | :---: |\n")
+
     all_extracted_data = []
 
     if os.path.exists(PDF_DIR):
+        pdfs_to_process = []
         if os.path.isdir(PDF_DIR):
             for filename in os.listdir(PDF_DIR):
                 if filename.lower().endswith(".pdf"):
-                    pdf_path = os.path.join(PDF_DIR, filename)
-                    print(f"\n--- Processing {filename} ---")
-                    data = extract_posts_from_pdf(pdf_path, MAX_PAGES)
-                    all_extracted_data.extend(data)
+                    pdfs_to_process.append(os.path.join(PDF_DIR, filename))
         elif os.path.isfile(PDF_DIR) and PDF_DIR.lower().endswith(".pdf"):
-            print(f"\n--- Processing {PDF_DIR} ---")
-            data = extract_posts_from_pdf(PDF_DIR, MAX_PAGES)
-            all_extracted_data.extend(data)
+            pdfs_to_process.append(PDF_DIR)
+            
+        for pdf_path in pdfs_to_process:
+            filename = os.path.basename(pdf_path)
+            print(f"\n--- Processing {filename} ---")
+            
+            try:
+                data = extract_posts_from_pdf(pdf_path, MAX_PAGES)
+                all_extracted_data.extend(data)
+                
+                if md_file:
+                    with open(md_file, "a", encoding="utf-8") as f:
+                        f.write(f"| {filename} | ✅ Done | {len(data)} |\n")
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
+                if md_file:
+                    with open(md_file, "a", encoding="utf-8") as f:
+                        f.write(f"| {filename} | ❌ Error | 0 |\n")
+                        
     else:
         print(f"Directory {PDF_DIR} not found.")
 
     if all_extracted_data:
         df = pd.DataFrame(all_extracted_data)
         
-        # Save as HTML report
         print(f"\nFound {len(all_extracted_data)} posts/communications total.")
         html_content = f"<html><body><h1>Extracted Social Media Posts & Internal Comms</h1>"
         html_content += "<table border='1'><tr><th>PDF Name</th><th>Screenshot</th><th>Date</th><th>Post Type</th><th>Text</th><th>Platform</th><th>Modus Operandi</th></tr>"
@@ -220,10 +253,10 @@ if __name__ == "__main__":
             html_content += f"<tr><td>{item['PDF Name']}</td><td>{img_tag}</td><td>{item['Date']}</td><td>{item['Post Type']}</td><td>{item['Extracted Text']}</td><td>{item['Platform']}</td><td>{item['Modus Operandi']}</td></tr>"
         html_content += "</table></body></html>"
         
-        with open("extracted_posts.html", "w") as f:
+        with open(html_file, "w") as f:
             f.write(html_content)
         
-        df.to_csv("extracted_posts.csv", index=False)
-        print("Saved clean results to extracted_posts.csv")
+        df.to_csv(csv_file, index=False)
+        print(f"Saved clean results to {csv_file}")
     else:
         print("No social media posts found in any of the PDFs.")

@@ -3,8 +3,17 @@ import xlsxwriter
 import os
 from PIL import Image
 
-csv_file = "recent_50_extracted_posts.csv"
-excel_file = "final_extracted_posts_with_images.xlsx"
+import argparse
+
+parser = argparse.ArgumentParser(description="Embed images into Excel file")
+parser.add_argument("--input-csv", type=str, default="recent_50_extracted_posts.csv", help="Path to input CSV")
+parser.add_argument("--images-dir", type=str, default="crops", help="Path to images directory")
+parser.add_argument("--output-excel", type=str, default="final_extracted_posts_with_images.xlsx", help="Path to output Excel")
+args = parser.parse_args()
+
+csv_file = args.input_csv
+excel_file = args.output_excel
+IMAGES_DIR = args.images_dir
 
 df = pd.read_csv(csv_file)
 
@@ -49,9 +58,8 @@ for idx, img_path in enumerate(image_paths):
     
     # Clean up the path
     if pd.notna(img_path) and img_path.strip() != "":
-        # Some might be "crops/file.png" and some might just be "file.png"
-        if not img_path.startswith("crops/"):
-            img_path = os.path.join("crops", img_path)
+        if not img_path.startswith(f"{IMAGES_DIR}/"):
+            img_path = os.path.join(IMAGES_DIR, os.path.basename(img_path))
             
         if os.path.exists(img_path):
             try:

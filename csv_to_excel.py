@@ -3,8 +3,15 @@ import xlsxwriter
 from PIL import Image
 import os
 
-csv_file = "extracted_posts.csv"
-excel_file = "extracted_posts_final.xlsx"
+import argparse
+
+parser = argparse.ArgumentParser(description="Convert extracted posts CSV to formatted Excel")
+parser.add_argument("--input-csv", type=str, default="extracted_posts.csv", help="Path to input CSV")
+parser.add_argument("--output-excel", type=str, default="extracted_posts_final.xlsx", help="Path to output Excel")
+args = parser.parse_args()
+
+csv_file = args.input_csv
+excel_file = args.output_excel
 
 df = pd.read_csv(csv_file)
 workbook = xlsxwriter.Workbook(excel_file)
