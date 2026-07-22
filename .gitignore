@@ -1,0 +1,32 @@
+# Data files
+*.pdf
+*.csv
+*.xlsx
+*.html
+*.txt
+*.log
+
+# Environment variables
+.env
+
+# Cache
+__pycache__/
+
+# Output and data directories
+recent 50 orders final/
+2026, sebi orders/
+sebi order 2025/
+crops/
+images/
+thumbnails/
+
+# Temporary / Scratchpad scripts
+get_correct_9.py
+process_missing_9.py
+process_remaining_pages.py
+check_pages.py
+check_sebi_dates.py
+test_pagination.py
+convert_csv_to_excel.py
+copy_2026_orders.py
+missing_orders.json
