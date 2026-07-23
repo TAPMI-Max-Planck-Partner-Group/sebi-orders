@@ -17,8 +17,9 @@ from google.genai import types
 
 from dotenv import load_dotenv
 load_dotenv()
-PROJECT_ID = os.environ.get("VERTEX_PROJECT_ID", "YOUR_VERTEX_AI_PROJECT_ID")
-REGIONS = ["us-central1", "us-east4", "us-east1", "europe-west4", "us-west1", "us-west4"]
+API_KEY = os.environ.get("GEMINI_API_KEY")
+if not API_KEY:
+    raise ValueError("GEMINI_API_KEY not found in .env file.")
 
 # --- Configuration ---
 PDF_DIR = "recent 50 orders final"
@@ -27,23 +28,11 @@ OUTPUT_DIR = "crops"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-MODEL_REGIONS = {}
-
-def call_gemini_with_fallback(model_name, contents, config=None, max_retries=18, base_sleep=1):
-    if model_name not in MODEL_REGIONS:
-        regions = list(REGIONS)
-        random.shuffle(regions)
-        MODEL_REGIONS[model_name] = regions
-        
-    regions = MODEL_REGIONS[model_name]
+def call_gemini(model_name, contents, config=None, max_retries=10, base_sleep=2):
+    client = genai.Client(api_key=API_KEY)
     
     for attempt in range(max_retries):
-        if not regions:
-            raise Exception(f"All regions permanently failed (404 Not Found) for {model_name}.")
-            
-        region = regions[0] # always try the front of the queue
         try:
-            client = genai.Client(vertexai=True, project=PROJECT_ID, location=region)
             return client.models.generate_content(
                 model=model_name,
                 contents=contents,
@@ -51,23 +40,17 @@ def call_gemini_with_fallback(model_name, contents, config=None, max_retries=18,
             )
         except Exception as e:
             error_str = str(e)
-            if "404" in error_str or "NOT_FOUND" in error_str:
-                print(f"[{model_name}] Not available in {region}. Removing permanently.")
-                regions.pop(0)
-            elif "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-                print(f"[{model_name}] Quota issue in {region}. Rotating to next region...")
-                regions.append(regions.pop(0)) # Move to back of queue
-                
-                # Sleep if we have cycled through all available regions once
-                if attempt >= len(regions) and attempt > 0:
-                    time.sleep(base_sleep)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "502" in error_str or "503" in error_str or "500" in error_str:
+                sleep_time = min(60, base_sleep * (2 ** attempt))
+                print(f"[{model_name}] Quota/Server issue. Sleeping {sleep_time}s and retrying (Attempt {attempt+1}/{max_retries})...")
+                time.sleep(sleep_time)
             else:
-                print(f"[{model_name}] Unexpected error in {region}: {e}")
+                print(f"[{model_name}] Unexpected error: {e}")
                 raise e
                 
     raise Exception(f"Failed to generate content with {model_name} after {max_retries} retries.")
 
-MODEL_NAME = "gemini-2.5-pro"
+MODEL_NAME = "gemini-pro-latest"
 
 
 SYSTEM_PROMPT = """
@@ -110,18 +93,19 @@ def extract_posts_from_pdf(pdf_path, max_pages=None, start_page=0):
         width, height = img.size
         
         # --- FLASH FILTER PASS ---
-        is_relevant = True
+        is_relevant = False
         try:
-            flash_response = call_gemini_with_fallback(
-                model_name="gemini-2.5-flash",
+            flash_response = call_gemini(
+                model_name="gemini-flash-latest",
                 contents=[img, FILTER_PROMPT],
                 config=types.GenerateContentConfig(temperature=0.0),
-                max_retries=18,
+                max_retries=5,
                 base_sleep=1
             )
             is_relevant = flash_response.text.strip().lower() == "true"
         except Exception as e:
-            print(f"Failed Flash filter for page {page_num + 1} across all regions. Proceeding to Pro anyway...")
+            print(f"Failed Flash filter for page {page_num + 1} across all regions. Skipping page to save Pro quota. Error: {e}")
+            is_relevant = False
             
         if not is_relevant:
             print(f"Skipping page {page_num + 1} (No relevant screenshots detected by Flash filter)")
@@ -131,14 +115,14 @@ def extract_posts_from_pdf(pdf_path, max_pages=None, start_page=0):
             
         # --- PRO EXTRACTION PASS ---
         try:
-            response = call_gemini_with_fallback(
+            response = call_gemini(
                 model_name=MODEL_NAME,
                 contents=[img, SYSTEM_PROMPT],
                 config=types.GenerateContentConfig(
                     temperature=0.0,
                     response_mime_type="application/json",
                 ),
-                max_retries=18,
+                max_retries=5,
                 base_sleep=1
             )
             
@@ -229,6 +213,12 @@ if __name__ == "__main__":
             try:
                 data = extract_posts_from_pdf(pdf_path, MAX_PAGES)
                 all_extracted_data.extend(data)
+                
+                # Iterative saving to prevent data loss!
+                if all_extracted_data:
+                    df = pd.DataFrame(all_extracted_data)
+                    df.to_csv(csv_file, index=False)
+                    print(f"Iteratively saved {len(all_extracted_data)} posts to {csv_file}")
                 
                 if md_file:
                     with open(md_file, "a", encoding="utf-8") as f:

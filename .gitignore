@@ -33,3 +33,4 @@ missing_orders.json
 download_live_2025_orders.py
 download_live_2026_orders.py
 download_orders.py
+*_crops/
