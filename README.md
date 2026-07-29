@@ -42,6 +42,12 @@ The core engine. It converts PDF pages to images in-memory and sends them to the
 - **Input:** Directory of PDFs.
 - **Output:** `extracted_posts.csv` and individual image crops saved in the `crops/` folder.
 
+**Vision Prompting & Cropping Methodology:**
+To balance cost, speed, and accuracy, the extraction pipeline utilizes a strict two-pass multimodal prompting system:
+1. **Flash Filter Pass (Binary Check):** Every page image is first sent to a lightweight model (`gemini-flash-latest`) with a highly focused prompt asking a simple `true`/`false` question: *"Does this page contain any visual screenshots of social media posts, messaging apps (like WhatsApp/Telegram), or internal chat communications?"* This prevents wasting compute on dense, text-only legal pages.
+2. **Pro Extraction Pass (Data & Coordinates):** If flagged as `true`, the image is passed to `gemini-pro-latest` with an extensive system prompt. The model is instructed to act as an expert analyst and return a strict JSON schema containing the extracted text, platform, modus operandi, and critically, the `box_2d` coordinates (normalized bounding box). 
+3. **Auto-Cropping:** The script translates the normalized `box_2d` coordinates back into actual image pixels and leverages Python's Pillow library to automatically slice the exact social media screenshot out of the PDF page, saving it physically for the reporting phase.
+
 ### 3. Reporting (`embed_images_in_excel.py` / `csv_to_excel.py`)
 Takes the raw CSV data and the physical image crops and stitches them together into a final, shareable Excel document where the images are embedded natively in the cells.
 
